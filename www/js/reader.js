@@ -299,6 +299,7 @@
     S.stats.days[key] = (S.stats.days[key] || 0) + 10;
     R.book.timeSec = (R.book.timeSec || 0) + 10;
     Store.save();
+    UI.syncWidget();
   }
 
   // ---------- Gestes ----------
@@ -394,7 +395,7 @@
     R.lastActivity = Date.now();
     if (d.direction === 'next') next(); else prev();
   });
-  Native.onPause(() => { if (R) Store.saveNow(); });
+  Native.onPause(() => { if (R) { Store.saveNow(); UI.syncWidget(); } });
 
   // ---------- Thème, lumière ----------
   function applyTheme() {
@@ -851,5 +852,5 @@
     R.pop = null;
   }
 
-  window.Reader = { open, close, get isOpen() { return !!R; } };
+  window.Reader = { open, close, get isOpen() { return !!R; }, get currentId() { return R ? R.id : null; } };
 })();

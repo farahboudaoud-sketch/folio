@@ -90,6 +90,16 @@ public class FolioPlugin extends Plugin {
 
     private void handleIncoming(Intent intent) {
         String action = intent.getAction();
+        if (FolioWidget.ACTION_OPEN_BOOK.equals(action)) {
+            String bookId = intent.getStringExtra("bookId");
+            getActivity().setIntent(new Intent(Intent.ACTION_MAIN));
+            if (bookId != null && !bookId.isEmpty()) {
+                JSObject data = new JSObject();
+                data.put("id", bookId);
+                notifyListeners("openBook", data, true);
+            }
+            return;
+        }
         Uri uri = null;
         if (Intent.ACTION_VIEW.equals(action)) {
             uri = intent.getData();
@@ -495,6 +505,38 @@ public class FolioPlugin extends Plugin {
         chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         getContext().startActivity(chooser);
         call.resolve();
+    }
+
+
+    // ---------- Widget de l'écran d'accueil ----------
+
+    @PluginMethod
+    public void updateWidget(PluginCall call) {
+        final String bookId = call.getString("id", "");
+        final String title = call.getString("title", "");
+        final int pct = call.getInt("pct", 0);
+        final String today = call.getString("today", "");
+        final String cover = call.getString("cover", null);
+        new Thread(() -> {
+            Context ctx = getContext();
+            SharedPreferences.Editor ed = ctx.getSharedPreferences(FolioWidget.PREFS, Context.MODE_PRIVATE).edit();
+            ed.putString("bookId", bookId).putString("title", title).putInt("pct", pct).putString("today", today);
+            if (cover != null) {
+                try {
+                    String b64 = cover.substring(cover.indexOf(',') + 1);
+                    byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                    try (FileOutputStream out = new FileOutputStream(FolioWidget.coverFile(ctx))) { out.write(bytes); }
+                    ed.putString("coverId", bookId);
+                } catch (Exception e) {
+                    ed.putString("coverId", "");
+                }
+            } else if (call.getBoolean("noCover", false)) {
+                ed.putString("coverId", "");
+            }
+            ed.apply();
+            FolioWidget.refreshAll(ctx);
+            call.resolve();
+        }).start();
     }
 
     @PluginMethod

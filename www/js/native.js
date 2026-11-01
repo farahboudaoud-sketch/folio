@@ -72,6 +72,14 @@
       if (F) F.addListener('incomingBook', cb);
     },
 
+    onOpenBook(cb) {
+      if (F) F.addListener('openBook', cb);
+    },
+
+    updateWidget(data) {
+      if (F) F.updateWidget(data).catch(() => {});
+    },
+
     onVolumeKey(cb) {
       if (F) F.addListener('volumeKey', cb);
     },

@@ -324,6 +324,7 @@
     else main.innerHTML = settingsHTML();
     $$('.tabbar button').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === view.tab ? 'page' : 'false'));
     bindView();
+    syncWidget();
     main.scrollTop = scroll;
   }
 
@@ -1007,6 +1008,29 @@
     };
   }
 
+
+  // ---------- Widget de l'écran d'accueil ----------
+  let widgetCoverId = null;
+  let widgetLast = '';
+  function syncWidget() {
+    if (!Native.isNative) return;
+    const cur = Object.values(S.books).filter((b) => statusOf(b) === 'reading' && !b.missing).sort((a, b) => b.openedAt - a.openedAt)[0];
+    const todayMin = Math.round((S.stats.days[Store.dayKey()] || 0) / 60);
+    const goal = S.prefs.goal || 0;
+    const today = goal ? `${Math.min(todayMin, goal)} / ${goal} min aujourd'hui` : (todayMin ? `${todayMin} min aujourd'hui` : '');
+    const data = cur ? { id: cur.id, title: cur.title, pct: Math.round((cur.pct || 0) * 100), today } : { id: '', title: '', pct: 0, today };
+    const key = JSON.stringify(data);
+    const coverChanged = cur ? widgetCoverId !== cur.id : widgetCoverId !== '';
+    if (key === widgetLast && !coverChanged) return;
+    widgetLast = key;
+    if (coverChanged) {
+      widgetCoverId = cur ? cur.id : '';
+      if (cur && covers[cur.id]) data.cover = covers[cur.id];
+      else data.noCover = true;
+    }
+    Native.updateWidget(data);
+  }
+
   // ---------- Démarrage ----------
   async function loadCovers() {
     await Promise.all(Object.keys(S.books).map(async (id) => {
@@ -1040,6 +1064,12 @@
     render();
     Native.onBack(onBack);
     Native.onIncomingBook(handleIncoming);
+    Native.onOpenBook((d) => {
+      if (!d || !S.books[d.id]) return;
+      if (Reader.isOpen && Reader.currentId === d.id) return;
+      closeOverlays();
+      Reader.open(d.id);
+    });
     if (Native.isNative) {
       Native.hasPassword().then((has) => {
         if (has !== S.prefs.kindle.hasPassword) { S.prefs.kindle.hasPassword = has; Store.save(); }
@@ -1049,7 +1079,7 @@
 
   window.UI = {
     esc, icon, toast, sheet, confirmDialog, alertDialog, promptDialog, pushBack, render, applyUiTheme,
-    fmtDur, statusOf, coverHTML, HL_COLORS, HL_NAMES, openDetail, closeOverlays
+    fmtDur, statusOf, coverHTML, HL_COLORS, HL_NAMES, openDetail, closeOverlays, syncWidget
   };
 
   document.addEventListener('DOMContentLoaded', start);

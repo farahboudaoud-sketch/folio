@@ -4,4 +4,8 @@
     <string name="title_activity_main">Folio</string>
     <string name="package_name">fr.folio.app</string>
     <string name="custom_url_scheme">fr.folio.app</string>
+    <string name="widget_description">Le livre en cours, ta progression et ton temps de lecture du jour</string>
+    <string name="widget_kicker">Reprendre</string>
+    <string name="widget_empty">Aucun livre en cours</string>
+    <string name="widget_cover">Couverture du livre</string>
 </resources>
