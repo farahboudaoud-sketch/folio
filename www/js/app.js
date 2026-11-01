@@ -312,7 +312,7 @@
   }
 
   // ---------- Navigation ----------
-  const view = { tab: 'books', filter: 'all', query: '', notesBook: '', notesColor: '' };
+  const view = { tab: 'books', filter: 'all', query: '', notesBook: '', notesColor: '', selecting: false, sel: new Set(), shown: [] };
 
   function render() {
     applyUiTheme();
@@ -328,6 +328,7 @@
   }
 
   function setTab(tab) {
+    if (view.selecting && tab !== 'books') { view.selecting = false; view.sel = new Set(); if (removeSelBack) { removeSelBack(); removeSelBack = null; } }
     view.tab = tab;
     $('#main').scrollTop = 0;
     render();
@@ -350,7 +351,9 @@
   function libraryHTML() {
     const all = sortedBooks();
     const q = view.query.trim().toLowerCase();
-    const head = `<div class="page-head"><h1>Bibliothèque</h1><button class="icon-btn filled" id="add-btn" aria-label="Ajouter un livre">${icon('plus')}</button></div>`;
+    const head = view.selecting
+      ? `<div class="page-head"><button class="icon-btn" data-sel="cancel" aria-label="Quitter la sélection">${icon('close')}</button><h1 style="font-size:22px;flex:1">${view.sel.size} sélectionné${view.sel.size > 1 ? 's' : ''}</h1><button class="link-btn" data-sel="all">Tout sélectionner</button></div>`
+      : `<div class="page-head"><h1>Bibliothèque</h1><button class="icon-btn filled" id="add-btn" aria-label="Ajouter un livre">${icon('plus')}</button></div>`;
     if (!all.length) {
       return `<div class="page">${head}<div class="empty">${icon('books', 40)}<h2>Ta bibliothèque est vide</h2>
         <p>Touche + pour choisir un fichier EPUB dans ton téléphone, ou ouvre un fichier .epub avec Folio depuis tes fichiers.</p>
@@ -358,7 +361,7 @@
     }
     let resume = '';
     const current = all.filter((b) => statusOf(b) === 'reading').sort((a, b) => b.openedAt - a.openedAt)[0];
-    if (current && !q && view.filter === 'all') {
+    if (current && !q && view.filter === 'all' && !view.selecting) {
       resume = `<button class="resume" data-open="${current.id}" data-book="${current.id}">${coverHTML(current)}
         <div class="resume-body"><div class="kicker">Reprendre</div><div class="resume-title">${esc(current.title)}</div>
         <div class="muted" style="font-size:14px">${esc([current.author, current.chapter].filter(Boolean).join(' · '))}</div>
@@ -382,12 +385,20 @@
       if (q) list = all.filter((b) => (b.title + ' ' + (b.author || '') + ' ' + (b.collections || []).map((id) => (S.collections.find((c) => c.id === id) || {}).name || '').join(' ')).toLowerCase().includes(q));
       const title = q ? 'Résultats' : activeColl ? esc(activeColl.name) : view.filter === 'all' ? 'Tous les livres' : chips.find((c) => c[0] === view.filter)[1];
       const sortSel = `<label class="sr" for="sort">Trier</label><select id="sort" class="sort-select">${[['recent', 'Récents'], ['added', 'Ajout'], ['title', 'Titre'], ['author', 'Auteur'], ['progress', 'Progression']].map(([k, l]) => `<option value="${k}"${S.prefs.sort === k ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
-      body = `<div class="section-head"><h2>${title} <span class="muted" style="font-weight:400">· ${list.length}</span></h2>${activeColl ? `<button class="link-btn" id="coll-menu" data-coll-id="${activeColl.id}">Modifier</button>` : sortSel}</div>`;
-      body += list.length ? `<div class="grid">${list.map((b) => `<button class="book" data-open="${b.id}" data-book="${b.id}" aria-label="${esc(b.title)}, ${esc(labelOf(b))}. Appui long pour la fiche.">
-          ${coverHTML(b)}${b.missing ? '<span class="badge">À réimporter</span>' : ''}
+      view.shown = list.map((b) => b.id);
+      if (view.selecting) {
+        }
+      const selBtn = list.length && !view.selecting ? `<button class="link-btn" id="sel-start">Sélectionner</button>` : '';
+      body = `<div class="section-head"><h2>${title} <span class="muted" style="font-weight:400">· ${list.length}</span></h2><div style="display:flex;align-items:center;gap:12px">${selBtn}${activeColl ? `<button class="link-btn" id="coll-menu" data-coll-id="${activeColl.id}">Modifier</button>` : sortSel}</div></div>`;
+      body += list.length ? `<div class="grid">${list.map((b) => `<button class="book${view.selecting && view.sel.has(b.id) ? ' picked' : ''}" data-open="${b.id}" data-book="${b.id}" ${view.selecting ? `aria-pressed="${view.sel.has(b.id)}" aria-label="${esc(b.title)}"` : `aria-label="${esc(b.title)}, ${esc(labelOf(b))}. Appui long pour la fiche."`}>
+          <div style="position:relative">${coverHTML(b)}${view.selecting ? `<span class="pick" aria-hidden="true">${icon('check', 16)}</span>` : ''}</div>${b.missing ? '<span class="badge">À réimporter</span>' : ''}
           <div class="bar thin"><div style="width:${statusOf(b) === 'done' ? 100 : Math.round((b.pct || 0) * 100)}%"></div></div>
           <div class="label">${esc(labelOf(b))}</div></button>`).join('')}</div>`
         : `<div class="list-empty">${q ? 'Aucun livre ne correspond.' : 'Aucun livre ici pour l\'instant.'}</div>`;
+      if (view.selecting) {
+        const dis = view.sel.size ? '' : ' disabled';
+        body += `<div class="sel-bar"><button class="tile-btn" data-sel="done"${dis}>${icon('check', 20)}Marquer lu</button><button class="tile-btn" data-sel="undone"${dis}>${icon('books', 20)}Non lu</button><button class="tile-btn" data-sel="coll"${dis}>${icon('list', 20)}Collection</button><button class="tile-btn danger" data-sel="remove"${dis}>${icon('trash', 20)}Retirer</button></div>`;
+      }
     }
     return `<div class="page">${head}
       <label class="search">${icon('search', 18)}<span class="sr">Rechercher</span><input id="q" type="search" placeholder="Titre, auteur, collection…" value="${esc(view.query)}" autocomplete="off"></label>
@@ -431,13 +442,18 @@
     const cm = $('#coll-menu', main);
     if (cm) cm.onclick = () => collectionMenu(cm.dataset.collId);
     $$('[data-book]', main).forEach((el) => {
-      bindLongPress(el, () => openDetail(el.dataset.book));
+      const ids = view.shown.includes(el.dataset.book) ? view.shown : [el.dataset.book];
+      bindLongPress(el, () => { if (view.selecting) toggleSel(el.dataset.book); else openDetail(el.dataset.book, ids); });
       el.addEventListener('click', () => {
+        if (view.selecting) { toggleSel(el.dataset.book); return; }
         const b = S.books[el.dataset.open];
-        if (b && b.missing) { openDetail(b.id); return; }
+        if (b && b.missing) { openDetail(b.id, ids); return; }
         Reader.open(el.dataset.open);
       });
     });
+    const ss = $('#sel-start', main);
+    if (ss) ss.onclick = () => startSelecting();
+    bindSelection(main);
     if (view.tab === 'notes') bindNotes(main);
     if (view.tab === 'stats') bindStats(main);
     if (view.tab === 'settings') bindSettings(main);
@@ -465,20 +481,124 @@
     };
   }
 
+
+  // ---------- Sélection multiple ----------
+  let removeSelBack = null;
+  function startSelecting(firstId) {
+    view.selecting = true;
+    view.sel = new Set(firstId ? [firstId] : []);
+    if (!removeSelBack) removeSelBack = pushBack(stopSelecting);
+    render();
+  }
+
+  function stopSelecting() {
+    view.selecting = false;
+    view.sel = new Set();
+    if (removeSelBack) { removeSelBack(); removeSelBack = null; }
+    render();
+  }
+
+  function toggleSel(id) {
+    if (view.sel.has(id)) view.sel.delete(id); else view.sel.add(id);
+    render();
+  }
+
+  function bindSelection(main) {
+    if (!view.selecting) return;
+    const all = $('[data-sel="all"]', main);
+    const allOn = view.shown.length && view.shown.every((id) => view.sel.has(id));
+    if (all) {
+      all.textContent = allOn ? 'Tout désélectionner' : 'Tout sélectionner';
+      all.onclick = () => { view.sel = allOn ? new Set() : new Set(view.shown); render(); };
+    }
+    const on = (k, fn) => { const el = $(`[data-sel="${k}"]`, main); if (el) el.onclick = fn; };
+    const chosen = () => [...view.sel].map((id) => S.books[id]).filter(Boolean);
+    on('cancel', stopSelecting);
+    on('done', () => {
+      const bs = chosen(); bs.forEach((b) => markDone(b, true)); Store.save();
+      toast(bs.length > 1 ? bs.length + ' livres marqués comme lus' : 'Livre marqué comme lu');
+      stopSelecting();
+    });
+    on('undone', () => {
+      const bs = chosen(); bs.forEach((b) => markDone(b, false)); Store.save();
+      toast(bs.length > 1 ? bs.length + ' livres marqués comme non lus' : 'Livre marqué comme non lu');
+      stopSelecting();
+    });
+    on('coll', () => {
+      const bs = chosen();
+      const draw = (sh) => {
+        sh.el.innerHTML = `<div class="grabber"></div><div class="sheet-head"><h2>Ajouter ${bs.length} livre${bs.length > 1 ? 's' : ''} à…</h2><button class="link-btn" data-a="new">Nouvelle</button></div>
+          ${S.collections.length ? S.collections.map((c) => `<button class="coll-row" data-c="${c.id}">${icon('list', 20)}<span>${esc(c.name)}</span></button>`).join('') : '<div class="list-empty">Aucune collection. Crée la première.</div>'}`;
+        const add = (cid, name) => {
+          bs.forEach((b) => { b.collections = b.collections || []; if (!b.collections.includes(cid)) b.collections.push(cid); });
+          Store.save(); sh.close(); toast('Ajouté à « ' + name + ' »'); stopSelecting();
+        };
+        $$('[data-c]', sh.el).forEach((btn) => { btn.onclick = () => add(btn.dataset.c, S.collections.find((c) => c.id === btn.dataset.c).name); });
+        sh.el.querySelector('[data-a="new"]').onclick = async () => {
+          const name = await promptDialog('Nouvelle collection', '', 'Créer');
+          if (name && name.trim()) { const c = { id: Store.uid(), name: name.trim() }; S.collections.push(c); add(c.id, c.name); }
+        };
+      };
+      const sh = sheet('');
+      draw(sh);
+    });
+    on('remove', async () => {
+      const bs = chosen();
+      if (!(await confirmDialog('Retirer ' + bs.length + ' livre' + (bs.length > 1 ? 's' : '') + ' ?', 'Leur progression, leurs passages surlignés et leurs marque-pages seront supprimés de Folio. Tes fichiers d\'origine ne sont pas touchés.', 'Retirer', true))) return;
+      for (const b of bs) await removeBook(b.id);
+      toast(bs.length > 1 ? bs.length + ' livres retirés' : 'Livre retiré');
+      stopSelecting();
+    });
+  }
+
   // ---------- Fiche du livre ----------
-  function openDetail(id) {
-    const b = S.books[id];
-    if (!b) return;
+  // Fiche du livre. `ids` = les livres affichés dans la bibliothèque, pour passer de l'un à l'autre en balayant.
+  function markDone(b, done) {
+    if (!done) { b.finishedAt = 0; return; }
+    if (!b.finishedAt) b.finishedAt = Date.now();
+    if (!b.openedAt) b.openedAt = Date.now();
+    if (!b.startedAt) b.startedAt = Date.now();
+  }
+
+  function openDetail(startId, ids) {
+    if (!S.books[startId]) return;
+    let list = (ids && ids.includes(startId)) ? ids.slice() : [startId];
+    let id = startId;
+    let b = S.books[id];
     const screen = document.createElement('div');
     screen.className = 'screen';
     screen.setAttribute('role', 'dialog');
-    screen.setAttribute('aria-label', 'Fiche de ' + b.title);
     document.body.appendChild(screen);
     let removeBack;
     const close = () => { screen.remove(); removeBack(); };
     removeBack = pushBack(close);
 
-    const draw = () => {
+    const go = (dir) => {
+      const i = list.indexOf(id) + dir;
+      if (i < 0 || i >= list.length) {
+        const body = screen.querySelector('.screen-body');
+        body.classList.remove('bump-l', 'bump-r'); void body.offsetWidth; body.classList.add(dir > 0 ? 'bump-l' : 'bump-r');
+        return;
+      }
+      id = list[i]; b = S.books[id];
+      draw(dir > 0 ? 'from-r' : 'from-l');
+    };
+    // Balayage horizontal pour passer au livre suivant / précédent
+    let t0 = null;
+    screen.addEventListener('touchstart', (e) => { const t = e.touches[0]; t0 = e.touches.length === 1 ? { x: t.clientX, y: t.clientY, time: Date.now() } : null; }, { passive: true });
+    screen.addEventListener('touchend', (e) => {
+      if (!t0 || document.querySelector('.scrim')) { t0 = null; return; }
+      const t = e.changedTouches[0];
+      const dx = t.clientX - t0.x; const dy = t.clientY - t0.y;
+      const quick = Date.now() - t0.time < 700;
+      t0 = null;
+      if (quick && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
+    });
+
+    const draw = (anim) => {
+      if (!S.books[id]) { close(); return; }
+      screen.setAttribute('aria-label', 'Fiche de ' + b.title);
+      const pos = list.indexOf(id);
       const st = statusOf(b);
       const pct = st === 'done' ? 100 : Math.round((b.pct || 0) * 100);
       const nHl = S.annotations.filter((a) => a.bookId === id).length;
@@ -486,8 +606,9 @@
       const desc = b.description || '';
       const longDesc = desc.length > 420;
       const colls = (b.collections || []).map((cid) => (S.collections.find((c) => c.id === cid) || {}).name).filter(Boolean);
-      screen.innerHTML = `<div class="screen-top"><button class="icon-btn" data-a="close" aria-label="Fermer la fiche">${icon('close')}</button></div>
-        <div class="screen-body">
+      const nav = list.length > 1 ? `<div class="detail-nav"><button class="icon-btn" data-a="prev" aria-label="Livre précédent"${pos <= 0 ? ' disabled' : ''}>${icon('back', 20)}</button><span>${pos + 1} / ${list.length}</span><button class="icon-btn" data-a="next" aria-label="Livre suivant"${pos >= list.length - 1 ? ' disabled' : ''}><svg width="20" height="20" viewBox="0 0 24 24" ${P}><path d="M9 5l7 7-7 7"/></svg></button></div>` : '';
+      screen.innerHTML = `<div class="screen-top"><button class="icon-btn" data-a="close" aria-label="Fermer la fiche">${icon('close')}</button>${nav}<span style="width:44px"></span></div>
+        <div class="screen-body${anim ? ' ' + anim : ''}">
           <div class="detail-head">${coverHTML(b)}<div style="display:flex;flex-direction:column;gap:6px;min-width:0">
             <h1>${esc(b.title)}</h1>${b.author ? `<div class="muted" style="font-size:15px">${esc(b.author)}</div>` : ''}<div class="meta">${esc(meta)}</div></div></div>
           ${b.missing ? `<p class="muted" style="margin:0">Ce livre vient d'une sauvegarde : le fichier n'est pas encore sur ce téléphone. Ajoute-le avec le bouton + pour le relire.</p>` : `
@@ -512,21 +633,27 @@
         </div>`;
       const on = (a, fn) => { const el = screen.querySelector(`[data-a="${a}"]`); if (el) el.onclick = fn; };
       on('close', close);
+      on('prev', () => go(-1));
+      on('next', () => go(1));
       on('read', () => { close(); Reader.open(id); });
       on('more', (e) => { screen.querySelector('[data-desc]').textContent = desc; e.target.remove(); });
       on('kindle', () => sendToKindle(b, screen.querySelector('[data-a="kindle"]'), draw));
       on('coll', () => pickCollections(b, () => { draw(); render(); }));
       on('done', () => {
-        if (statusOf(b) === 'done') { b.finishedAt = 0; }
-        else { b.finishedAt = Date.now(); if (!b.openedAt) b.openedAt = Date.now(); if (!b.startedAt) b.startedAt = Date.now(); }
+        markDone(b, statusOf(b) !== 'done');
         Store.save(); draw(); render();
       });
       on('remove', async () => {
         if (!(await confirmDialog('Retirer « ' + b.title + ' » ?', 'Le livre, sa progression, ses passages surlignés et ses marque-pages seront supprimés de Folio. Ton fichier d\'origine n\'est pas touché.', 'Retirer', true))) return;
-        await removeBook(id);
-        close();
+        const gone = id;
+        const i = list.indexOf(gone);
+        await removeBook(gone);
+        list = list.filter((x) => x !== gone);
         render();
         toast('Livre retiré');
+        if (!list.length) { close(); return; }
+        id = list[Math.min(i, list.length - 1)]; b = S.books[id];
+        draw();
       });
     };
     draw();
