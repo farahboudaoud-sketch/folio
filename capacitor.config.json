@@ -1,0 +1,14 @@
+{
+  "appId": "fr.folio.app",
+  "appName": "Folio",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#F6F1E7"
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "LIGHT",
+      "insetsHandling": "css"
+    }
+  }
+}

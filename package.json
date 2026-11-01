@@ -1,0 +1,25 @@
+{
+  "name": "folio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Folio – liseuse EPUB",
+  "scripts": {
+    "sync": "cap sync android",
+    "vendor": "node scripts/vendor.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8.6.0",
+    "@fontsource/atkinson-hyperlegible": "^5.0.0",
+    "@fontsource/inter": "^5.0.0",
+    "@fontsource/literata": "^5.0.0",
+    "@fontsource/source-serif-4": "^5.0.0",
+    "epubjs": "^0.3.93",
+    "jszip": "^3.10.1"
+  }
+}
