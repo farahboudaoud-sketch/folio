@@ -11,4 +11,6 @@
     android:initialLayout="@layout/folio_widget"
     android:previewLayout="@layout/folio_widget"
     android:description="@string/widget_description"
-    android:widgetCategory="home_screen" />
+    android:widgetCategory="home_screen"
+    android:configure="fr.folio.app.WidgetConfigActivity"
+    android:widgetFeatures="reconfigurable|configuration_optional" />

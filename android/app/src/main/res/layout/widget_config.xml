@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cfg_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F6F1E7"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="serif"
+                android:text="Personnaliser le widget"
+                android:textColor="#2A2622"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <FrameLayout
+                android:id="@+id/cfg_preview_wrap"
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:layout_marginTop="20dp"
+                android:background="#D9CFBE"
+                android:padding="24dp">
+
+                <FrameLayout
+                    android:id="@+id/cfg_preview"
+                    android:layout_width="152dp"
+                    android:layout_height="152dp"
+                    android:layout_gravity="center" />
+            </FrameLayout>
+
+            <TextView style="@style/FolioCfgLabel" android:text="Thème" />
+            <RadioGroup android:id="@+id/cfg_theme" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                <RadioButton android:id="@+id/cfg_theme_creme" style="@style/FolioCfgRadio" android:text="Crème" />
+                <RadioButton android:id="@+id/cfg_theme_bordeaux" style="@style/FolioCfgRadio" android:text="Bordeaux" />
+                <RadioButton android:id="@+id/cfg_theme_sombre" style="@style/FolioCfgRadio" android:text="Sombre" />
+            </RadioGroup>
+
+            <TextView style="@style/FolioCfgLabel" android:text="Fond" />
+            <RadioGroup android:id="@+id/cfg_bg" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                <RadioButton android:id="@+id/cfg_bg_opaque" style="@style/FolioCfgRadio" android:text="Opaque" />
+                <RadioButton android:id="@+id/cfg_bg_semi" style="@style/FolioCfgRadio" android:text="Semi-transparent" />
+            </RadioGroup>
+
+            <Switch
+                android:id="@+id/cfg_cover"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="16dp"
+                android:text="Afficher la couverture"
+                android:textColor="#2A2622"
+                android:textSize="16sp" />
+
+            <Switch
+                android:id="@+id/cfg_today"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Afficher le temps lu aujourd'hui"
+                android:textColor="#2A2622"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:orientation="horizontal"
+        android:padding="16dp">
+
+        <Button
+            android:id="@+id/cfg_cancel"
+            android:layout_width="wrap_content"
+            android:layout_height="52dp"
+            android:background="@android:color/transparent"
+            android:text="Annuler"
+            android:textAllCaps="false"
+            android:textColor="#2F5D50"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/cfg_save"
+            android:layout_width="wrap_content"
+            android:layout_height="52dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/cfg_btn"
+            android:paddingStart="28dp"
+            android:paddingEnd="28dp"
+            android:text="Enregistrer"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp" />
+    </LinearLayout>
+</LinearLayout>

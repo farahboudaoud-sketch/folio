@@ -3,7 +3,7 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_bg"
+    android:background="@drawable/widget_bg_creme"
     android:orientation="vertical"
     android:padding="12dp">
 
@@ -74,6 +74,28 @@
         android:max="1000"
         android:progress="0"
         android:progressDrawable="@drawable/widget_progress" />
+
+    <ProgressBar
+        android:id="@+id/widget_bar_bordeaux"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="5dp"
+        android:layout_marginTop="6dp"
+        android:max="1000"
+        android:progress="0"
+        android:visibility="gone"
+        android:progressDrawable="@drawable/widget_progress_bordeaux" />
+
+    <ProgressBar
+        android:id="@+id/widget_bar_sombre"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="5dp"
+        android:layout_marginTop="6dp"
+        android:max="1000"
+        android:progress="0"
+        android:visibility="gone"
+        android:progressDrawable="@drawable/widget_progress_sombre" />
 
     <TextView
         android:id="@+id/widget_today"

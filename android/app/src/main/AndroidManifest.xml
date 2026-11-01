@@ -52,6 +52,17 @@
             </intent-filter>
         </activity>
 
+        <!-- Personnalisation du widget (appui long › Paramètres) -->
+        <activity
+            android:name=".WidgetConfigActivity"
+            android:exported="true"
+            android:label="Widget Folio"
+            android:theme="@style/FolioWidgetConfig">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <!-- Widget 2×2 : livre en cours -->
         <receiver
             android:name=".FolioWidget"

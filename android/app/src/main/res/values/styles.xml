@@ -19,4 +19,33 @@
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
     </style>
+
+    <!-- Écran de personnalisation du widget -->
+    <style name="FolioWidgetConfig" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">#4A1420</item>
+        <item name="android:colorPrimary">#F6F1E7</item>
+        <item name="android:statusBarColor">#F6F1E7</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">#F6F1E7</item>
+    </style>
+
+    <style name="FolioCfgLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">20dp</item>
+        <item name="android:layout_marginBottom">4dp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textColor">#5E564C</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="FolioCfgRadio">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textColor">#2A2622</item>
+        <item name="android:textSize">15sp</item>
+    </style>
 </resources>
