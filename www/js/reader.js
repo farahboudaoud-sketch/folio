@@ -655,7 +655,7 @@
 
   // ---------- Panneau « Texte » ----------
   function openText() {
-    const s = UI.sheet('', { parent: R.root });
+    const s = UI.sheet('', { parent: R.root, half: true });
     R.closers.push(s.close);
     const draw = () => {
       const st = R.settings;
@@ -710,7 +710,7 @@
 
   // ---------- Panneau « Lumière » ----------
   function openLight() {
-    const s = UI.sheet('', { parent: R.root });
+    const s = UI.sheet('', { parent: R.root, half: true });
     R.closers.push(s.close);
     const draw = () => {
       const b = S.prefs.brightness;

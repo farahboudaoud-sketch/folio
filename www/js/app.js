@@ -115,9 +115,9 @@
   function sheet(html, opts) {
     opts = opts || {};
     const scrim = document.createElement('div');
-    scrim.className = 'scrim' + (opts.center ? ' center' : '');
+    scrim.className = 'scrim' + (opts.center ? ' center' : '') + (opts.half ? ' clear' : '');
     scrim.innerHTML = opts.center ? `<div class="dialog" role="dialog" aria-modal="true">${html}</div>`
-      : `<div class="sheet${opts.tall ? ' tall' : ''}" role="dialog" aria-modal="true"><div class="grabber"></div>${html}</div>`;
+      : `<div class="sheet${opts.tall ? ' tall' : ''}${opts.half ? ' half' : ''}" role="dialog" aria-modal="true"><div class="grabber"></div>${html}</div>`;
     (opts.parent || document.body).appendChild(scrim);
     let removeBack;
     const close = () => {

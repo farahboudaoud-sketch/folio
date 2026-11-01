@@ -291,3 +291,9 @@ textarea.text-input { height: 120px; padding: 12px 14px; line-height: 1.5; resiz
 @keyframes fromL { from { transform: translateX(-48px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes bumpL { 50% { transform: translateX(-14px); } }
 @keyframes bumpR { 50% { transform: translateX(14px); } }
+
+/* Volets « Affichage » et « Lumière » : moitié basse de l'écran, le texte reste visible au-dessus */
+.scrim.clear { background: transparent; animation: none; }
+.sheet.half { max-height: calc(50vh - var(--sab)); gap: 14px; box-shadow: 0 -6px 24px rgba(0,0,0,0.18), 0 var(--sab) 0 0 var(--card); }
+.sheet.half .grabber { position: sticky; top: 0; z-index: 2; }
+.sheet.half .sheet-head { position: sticky; top: -10px; z-index: 1; background: var(--card); margin: -6px -20px 0; padding: 6px 20px 4px; }
