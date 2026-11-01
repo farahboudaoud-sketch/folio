@@ -171,10 +171,25 @@
   }
 
   // ---------- Import des livres ----------
+  // Résumé : certains EPUB encodent le HTML plusieurs fois (&amp;amp;lt;p&amp;amp;gt;…). On décode jusqu'au bout, puis on garde le texte.
   function stripHtml(html) {
     if (!html) return '';
-    const doc = new DOMParser().parseFromString(String(html), 'text/html');
-    return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+    let s = String(html);
+    const ta = document.createElement('textarea');
+    for (let i = 0; i < 8; i++) {
+      ta.innerHTML = s;
+      const d = ta.value;
+      if (d === s) break;
+      s = d;
+    }
+    s = s.replace(/<\s*br\s*\/?>/gi, '\n').replace(/<\/\s*(p|div|li|h[1-6])\s*>/gi, '\n\n');
+    const doc = new DOMParser().parseFromString(s, 'text/html');
+    return (doc.body.textContent || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/ *\n */g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   }
 
   async function makeCover(epub) {
@@ -469,7 +484,7 @@
       const nHl = S.annotations.filter((a) => a.bookId === id).length;
       const meta = [b.year, b.pages ? b.pages + ' pages' : '', 'EPUB ' + fmtSize(b.size)].filter(Boolean).join(' · ');
       const desc = b.description || '';
-      const longDesc = desc.length > 360;
+      const longDesc = desc.length > 420;
       const colls = (b.collections || []).map((cid) => (S.collections.find((c) => c.id === cid) || {}).name).filter(Boolean);
       screen.innerHTML = `<div class="screen-top"><button class="icon-btn" data-a="close" aria-label="Fermer la fiche">${icon('close')}</button></div>
         <div class="screen-body">
@@ -481,7 +496,7 @@
           <button class="btn btn-primary btn-block" data-a="read">${st === 'new' ? 'Commencer la lecture' : st === 'done' ? 'Relire' : 'Reprendre la lecture'}</button>
           <button class="btn btn-outline btn-block" data-a="kindle">${icon('kindle', 20)} <span>Envoyer à ma Kindle</span></button>
           ${b.kindleSentAt ? `<div class="sent-note">Envoyé à la Kindle le ${fmtDate(b.kindleSentAt)}</div>` : ''}`}
-          ${desc ? `<div class="summary"><h2>Résumé</h2><p data-desc>${esc(longDesc ? desc.slice(0, 340).replace(/\s\S*$/, '') + '…' : desc)}</p>${longDesc ? '<button class="more" data-a="more">Lire la suite</button>' : ''}</div>` : ''}
+          ${desc ? `<div class="summary"><h2>Résumé</h2><p data-desc>${esc(longDesc ? desc.slice(0, 400).replace(/\s\S*$/, '') + '…' : desc)}</p>${longDesc ? '<button class="more" data-a="more">Lire la suite</button>' : ''}</div>` : ''}
           ${colls.length ? `<div class="meta">Collections : ${esc(colls.join(', '))}</div>` : ''}
           <div class="actions3">
             <button class="tile-btn" data-a="coll">${icon('list', 20)}Collection</button>
@@ -889,6 +904,11 @@
       </nav>`;
     $$('.tabbar button').forEach((b) => { b.onclick = () => setTab(b.dataset.tab); });
     applyUiTheme();
+    let fixed = false;
+    Object.values(S.books).forEach((b) => {
+      if (b.description && /[<>]|&[#a-z0-9]+;/i.test(b.description)) { b.description = stripHtml(b.description); fixed = true; }
+    });
+    if (fixed) Store.save();
     await loadCovers();
     render();
     Native.onBack(onBack);
