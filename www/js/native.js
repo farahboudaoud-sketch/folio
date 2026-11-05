@@ -94,6 +94,11 @@
       document.addEventListener('visibilitychange', () => { if (document.hidden) cb(); });
     },
 
+    onResume(cb) {
+      if (App) App.addListener('resume', cb);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) cb(); });
+    },
+
     exitApp() {
       if (App) App.exitApp();
     },

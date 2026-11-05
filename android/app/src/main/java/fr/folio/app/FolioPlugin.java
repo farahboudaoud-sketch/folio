@@ -444,12 +444,14 @@ public class FolioPlugin extends Plugin {
         JSObject ret = new JSObject();
         if (value < 0) { ret.put("ok", true); call.resolve(ret); return; }
         if (!canWriteSettings()) { ret.put("ok", false); call.resolve(ret); return; }
+        android.content.ContentResolver cr = getContext().getContentResolver();
+        // Le passage en mode manuel peut être refusé sur certains téléphones : on règle quand même la valeur
         try {
-            android.content.ContentResolver cr = getContext().getContentResolver();
             android.provider.Settings.System.putInt(cr, android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE, android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL);
+        } catch (Exception ignored) { }
+        try {
             int v = (int) Math.round(Math.max(0.01, Math.min(1.0, value)) * 255);
-            android.provider.Settings.System.putInt(cr, android.provider.Settings.System.SCREEN_BRIGHTNESS, Math.max(1, v));
-            ret.put("ok", true);
+            ret.put("ok", android.provider.Settings.System.putInt(cr, android.provider.Settings.System.SCREEN_BRIGHTNESS, Math.max(1, v)));
         } catch (Exception e) {
             ret.put("ok", false);
         }

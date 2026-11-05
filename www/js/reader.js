@@ -377,24 +377,26 @@
       'Autoriser').then((ok) => { if (ok) Native.openBrightnessPermission(); });
   }
 
+  // On demande toujours à Android (et non à une valeur gardée en mémoire) si Folio a l'autorisation :
+  // elle peut avoir été donnée entre-temps dans les réglages.
   function setBrightness(v) {
     v = Math.min(1, Math.max(0.02, v));
     Light.value = v; Light.auto = false;
     if (!Native.isNative) { applyLight(); return; }
-    if (!Light.allowed) { askBrightnessPermission(); return; }
     bPending = v;
     if (bTimer) return;
     bTimer = setTimeout(async () => {
       bTimer = null;
       const ok = await Native.setBrightness(bPending);
-      if (!ok) { Light.allowed = false; askBrightnessPermission(); }
+      Light.allowed = ok;
+      if (!ok) askBrightnessPermission();
     }, 50);
   }
 
   async function setAuto(on) {
     if (!Native.isNative) { Light.auto = on; return true; }
-    if (!Light.allowed) { askBrightnessPermission(); return false; }
     const ok = await Native.setAutoBrightness(on);
+    Light.allowed = ok;
     if (ok) Light.auto = on; else askBrightnessPermission();
     return ok;
   }
@@ -511,6 +513,8 @@
     if (d.direction === 'next') next(); else prev();
   });
   Native.onPause(() => { if (R) { Store.saveNow(); UI.syncWidget(); } });
+  // Retour dans Folio (par exemple après avoir donné l'autorisation) : on relit l'état de la luminosité
+  Native.onResume(() => { if (R) refreshBrightness().then(() => { const h = R && R.root.querySelector('.sheet [data-a="allow"]'); if (h && Light.allowed) h.closest('.help').remove(); }); });
 
   // ---------- Thème, lumière ----------
   function applyTheme() {
