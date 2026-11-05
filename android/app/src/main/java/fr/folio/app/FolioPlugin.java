@@ -407,16 +407,84 @@ public class FolioPlugin extends Plugin {
         });
     }
 
+    // Luminosité : Folio règle la luminosité du téléphone lui-même (permission « Modifier les paramètres
+    // système »), sans bloquer le curseur du volet de notifications.
+    private boolean canWriteSettings() {
+        return Build.VERSION.SDK_INT < 23 || android.provider.Settings.System.canWrite(getContext());
+    }
+
+    private void clearWindowOverride() {
+        getActivity().runOnUiThread(() -> {
+            WindowManager.LayoutParams lp = getActivity().getWindow().getAttributes();
+            if (lp.screenBrightness != WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE) {
+                lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
+                getActivity().getWindow().setAttributes(lp);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void getBrightness(PluginCall call) {
+        JSObject ret = new JSObject();
+        android.content.ContentResolver cr = getContext().getContentResolver();
+        int value = 128;
+        boolean auto = false;
+        try { value = android.provider.Settings.System.getInt(cr, android.provider.Settings.System.SCREEN_BRIGHTNESS); } catch (Exception ignored) { }
+        try { auto = android.provider.Settings.System.getInt(cr, android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE) == android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC; } catch (Exception ignored) { }
+        ret.put("value", Math.max(0.0, Math.min(1.0, value / 255.0)));
+        ret.put("auto", auto);
+        ret.put("allowed", canWriteSettings());
+        call.resolve(ret);
+    }
+
     @PluginMethod
     public void setBrightness(PluginCall call) {
         final double value = call.getDouble("value", -1.0);
-        getActivity().runOnUiThread(() -> {
-            WindowManager.LayoutParams lp = getActivity().getWindow().getAttributes();
-            lp.screenBrightness = value < 0 ? WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                    : (float) Math.max(0.01, Math.min(1.0, value));
-            getActivity().getWindow().setAttributes(lp);
-            call.resolve();
-        });
+        clearWindowOverride();
+        JSObject ret = new JSObject();
+        if (value < 0) { ret.put("ok", true); call.resolve(ret); return; }
+        if (!canWriteSettings()) { ret.put("ok", false); call.resolve(ret); return; }
+        try {
+            android.content.ContentResolver cr = getContext().getContentResolver();
+            android.provider.Settings.System.putInt(cr, android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE, android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL);
+            int v = (int) Math.round(Math.max(0.01, Math.min(1.0, value)) * 255);
+            android.provider.Settings.System.putInt(cr, android.provider.Settings.System.SCREEN_BRIGHTNESS, Math.max(1, v));
+            ret.put("ok", true);
+        } catch (Exception e) {
+            ret.put("ok", false);
+        }
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void setAutoBrightness(PluginCall call) {
+        final boolean on = Boolean.TRUE.equals(call.getBoolean("on", true));
+        clearWindowOverride();
+        JSObject ret = new JSObject();
+        if (!canWriteSettings()) { ret.put("ok", false); call.resolve(ret); return; }
+        try {
+            android.provider.Settings.System.putInt(getContext().getContentResolver(), android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE,
+                    on ? android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC : android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL);
+            ret.put("ok", true);
+        } catch (Exception e) {
+            ret.put("ok", false);
+        }
+        call.resolve(ret);
+    }
+
+    /** Ouvre l'écran Android « Modifier les paramètres système » pour Folio. */
+    @PluginMethod
+    public void openBrightnessPermission(PluginCall call) {
+        try {
+            Intent i = new Intent(android.provider.Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:" + getContext().getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+        } catch (Exception e) {
+            Intent i = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getContext().getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+        }
+        call.resolve();
     }
 
     @PluginMethod

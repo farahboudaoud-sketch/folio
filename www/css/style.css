@@ -205,9 +205,9 @@ textarea.text-input { height: 120px; padding: 12px 14px; line-height: 1.5; resiz
 
 /* ---------- Lecture ---------- */
 #reader { position: fixed; inset: 0; z-index: 40; background: var(--bg); color: var(--fg); }
-#viewer { position: absolute; left: 0; right: 0; top: calc(var(--sat) + 28px); bottom: calc(var(--sab) + 28px); }
+#viewer { position: absolute; left: 0; right: 0; top: calc(var(--sat) + 28px); bottom: calc(var(--sab) + 34px); }
 #viewer.scrolled { top: var(--sat); bottom: var(--sab); }
-.reader-foot { position: absolute; left: 0; right: 0; bottom: var(--sab); height: 28px; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; font-size: 11px; color: var(--muted); pointer-events: none; }
+.reader-foot { position: absolute; left: 0; right: 0; bottom: var(--sab); height: 34px; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 22px; font-size: 11px; color: var(--muted); background: transparent; border: none; z-index: 4; }
 .reader-head { position: absolute; left: 0; right: 0; top: var(--sat); height: 28px; display: flex; align-items: center; justify-content: center; padding: 0 22px; font-size: 11px; color: var(--muted); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #edge { position: absolute; left: 0; top: calc(var(--sat) + 60px); bottom: calc(var(--sab) + 60px); width: 26px; z-index: 5; touch-action: none; }
 #warm { position: absolute; inset: 0; pointer-events: none; background: rgb(255, 150, 40); mix-blend-mode: multiply; z-index: 6; }
@@ -297,3 +297,13 @@ textarea.text-input { height: 120px; padding: 12px 14px; line-height: 1.5; resiz
 .sheet.half { max-height: calc(50vh - var(--sab)); gap: 14px; box-shadow: 0 -6px 24px rgba(0,0,0,0.18), 0 var(--sab) 0 0 var(--card); }
 .sheet.half .grabber { position: sticky; top: 0; z-index: 2; }
 .sheet.half .sheet-head { position: sticky; top: -10px; z-index: 1; background: var(--card); margin: -6px -20px 0; padding: 6px 20px 4px; }
+
+/* Luminosité sous le titre (menu de lecture) */
+.r-bright { display: flex; align-items: center; gap: 10px; padding: 0 16px 12px; color: var(--muted); }
+.r-bright input[type=range] { flex: 1; accent-color: var(--accent); height: 32px; margin: 0; }
+.auto-chip { height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--chip-line); background: transparent; color: var(--fg); font-size: 13px; }
+.auto-chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
+
+/* « Revenir à la page… » après un saut */
+.back-pill { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--sab) + 46px); z-index: 12; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 22px; border: none; background: var(--fg); color: var(--bg); font-size: 14px; font-weight: 600; box-shadow: var(--shadow); white-space: nowrap; animation: fade .2s ease; }
+.back-pill.in-menu { bottom: auto; top: calc(var(--sat) + 132px); }

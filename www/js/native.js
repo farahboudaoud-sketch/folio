@@ -122,8 +122,24 @@
       if (F) F.keepAwake({ on: !!on }).catch(() => {});
     },
 
-    setBrightness(value) {
-      if (F) F.setBrightness({ value }).catch(() => {});
+    // Luminosité réelle du téléphone. Renvoie false si Folio n'a pas la permission.
+    async setBrightness(value) {
+      if (!F) return false;
+      try { return (await F.setBrightness({ value })).ok; } catch (e) { return false; }
+    },
+
+    async setAutoBrightness(on) {
+      if (!F) return false;
+      try { return (await F.setAutoBrightness({ on: !!on })).ok; } catch (e) { return false; }
+    },
+
+    async getBrightness() {
+      if (!F) return { value: 0.6, auto: false, allowed: false };
+      try { return await F.getBrightness(); } catch (e) { return { value: 0.6, auto: false, allowed: false }; }
+    },
+
+    openBrightnessPermission() {
+      if (F) F.openBrightnessPermission().catch(() => {});
     },
 
     setVolumeKeys(on) {

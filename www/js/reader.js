@@ -67,7 +67,7 @@
     const root = document.createElement('div');
     root.id = 'reader';
     root.innerHTML = `<div class="reader-head" id="rh"></div><div id="viewer"></div>
-      <div class="reader-foot"><span id="rf-l"></span><span id="rf-r"></span></div>
+      <button class="reader-foot" id="rfoot" aria-label="Changer l\'affichage : pages ou temps restant"><span id="rf-l"></span><span id="rf-r"></span></button>
       <div id="edge" aria-hidden="true"></div><div id="warm" hidden></div><div id="dim" hidden></div>
       <div class="loading" id="rload">Ouverture…</div>`;
     document.body.appendChild(root);
@@ -80,6 +80,7 @@
     R.removeBack = UI.pushBack(() => close());
     applyTheme();
     applyLight();
+    refreshBrightness();
     Native.keepAwake(S.prefs.keepAwake);
     Native.setVolumeKeys(S.prefs.volumeKeys);
 
@@ -104,6 +105,11 @@
     await build(targetCfi || b.cfi || undefined);
     loadLocations();
     bindEdge();
+    R.root.querySelector('#rfoot').onclick = () => {
+      S.prefs.footer = S.prefs.footer === 'time' ? 'pages' : 'time';
+      Store.save();
+      updateFooter();
+    };
     R.timer = setInterval(tick, 10000);
   }
 
@@ -284,11 +290,121 @@
 
     const head = R.root.querySelector('#rh');
     if (head) head.textContent = b.chapter || b.title;
+    updateFooter();
+    if (R.back && R.back.shownAt && now - R.back.shownAt > 1500 && idx !== null && R.back.page && Math.abs(idx + 1 - R.back.page) <= 1) clearBack();
+    if (R.menu) refreshMenu();
+  }
+
+
+  // Bas de page : « p. 12 / 380 · 37 % » ou « 12 min dans le chapitre · 2 h 10 dans le livre » (un tap pour changer)
+  function fmtMin(min) { return min < 60 ? min + ' min' : UI.fmtDur(min * 60); }
+  function updateFooter() {
+    if (!R) return;
     const fl = R.root.querySelector('#rf-l');
     const fr = R.root.querySelector('#rf-r');
-    if (fl) fl.textContent = idx !== null ? `p. ${idx + 1} / ${R.total}` : '';
-    if (fr) fr.textContent = idx !== null ? Math.round(b.pct * 100) + ' %' : '';
-    if (R.menu) refreshMenu();
+    if (!fl || !fr) return;
+    const { idx, left } = chapterInfo(R.location);
+    if (idx === null) { fl.textContent = R.total ? '' : 'Calcul des pages…'; fr.textContent = ''; return; }
+    if (S.prefs.footer === 'time') {
+      const speed = S.stats.speed || 1.3;
+      const bookLeft = Math.max(1, Math.round((R.total - idx - 1) / speed));
+      fl.textContent = fmtMin(left) + ' dans le chapitre';
+      fr.textContent = fmtMin(bookLeft) + ' dans le livre';
+    } else {
+      fl.textContent = `p. ${idx + 1} / ${R.total}`;
+      fr.textContent = Math.round((R.book.pct || 0) * 100) + ' %';
+    }
+  }
+
+  // ---------- Retour à la position d'avant un saut (barre de progression, sommaire, recherche…) ----------
+  function jumpTo(target) {
+    if (!R) return Promise.resolve();
+    const from = R.location ? { cfi: R.location.start.cfi, page: (locIndex(R.location) ?? -1) + 1 } : null;
+    return R.rendition.display(target).then(() => { if (from) showBack(from); });
+  }
+
+  function showBack(from) {
+    if (!R) return;
+    R.back = { cfi: from.cfi, page: from.page > 0 ? from.page : null, shownAt: Date.now() };
+    clearTimeout(R.backTimer);
+    R.backTimer = setTimeout(clearBack, 20000);
+    renderBack();
+  }
+
+  function clearBack() {
+    if (!R) return;
+    R.back = null;
+    clearTimeout(R.backTimer);
+    renderBack();
+  }
+
+  function goBack() {
+    if (!R || !R.back) return;
+    const cfi = R.back.cfi;
+    R.back = null;
+    renderBack();
+    R.rendition.display(cfi);
+  }
+
+  function renderBack() {
+    if (!R) return;
+    const old = R.root.querySelector('.back-pill');
+    if (old) old.remove();
+    if (!R.back) { if (R.menu) refreshMenu(); return; }
+    const label = R.back.page ? 'Revenir à la page ' + R.back.page : 'Revenir où j\'en étais';
+    const btn = document.createElement('button');
+    btn.className = 'back-pill' + (R.menu ? ' in-menu' : '');
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 010 10h-3"/></svg>${esc(label)}`;
+    btn.onclick = (e) => { e.stopPropagation(); goBack(); };
+    R.root.appendChild(btn);
+  }
+
+  // ---------- Luminosité : celle du téléphone (le curseur du volet de notifications reste utilisable) ----------
+  const Light = { value: 0.6, auto: false, allowed: false };
+  let bPending = null; let bTimer = null; let askedAt = 0;
+  async function refreshBrightness() {
+    const b = await Native.getBrightness();
+    Object.assign(Light, b);
+    if (R && R.menu) syncBrightSlider();
+    return Light;
+  }
+
+  function askBrightnessPermission() {
+    if (Date.now() - askedAt < 4000 || document.querySelector('.scrim.center')) return;
+    askedAt = Date.now();
+    UI.confirmDialog('Autoriser Folio à régler la luminosité ?',
+      'Android demande une autorisation (« Modifier les paramètres système ») pour que Folio change la luminosité du téléphone. Le curseur de ton volet de notifications continuera de fonctionner normalement.',
+      'Autoriser').then((ok) => { if (ok) Native.openBrightnessPermission(); });
+  }
+
+  function setBrightness(v) {
+    v = Math.min(1, Math.max(0.02, v));
+    Light.value = v; Light.auto = false;
+    if (!Native.isNative) { applyLight(); return; }
+    if (!Light.allowed) { askBrightnessPermission(); return; }
+    bPending = v;
+    if (bTimer) return;
+    bTimer = setTimeout(async () => {
+      bTimer = null;
+      const ok = await Native.setBrightness(bPending);
+      if (!ok) { Light.allowed = false; askBrightnessPermission(); }
+    }, 50);
+  }
+
+  async function setAuto(on) {
+    if (!Native.isNative) { Light.auto = on; return true; }
+    if (!Light.allowed) { askBrightnessPermission(); return false; }
+    const ok = await Native.setAutoBrightness(on);
+    if (ok) Light.auto = on; else askBrightnessPermission();
+    return ok;
+  }
+
+  function syncBrightSlider() {
+    if (!R || !R.menu) return;
+    const r = R.menu.top.querySelector('[data-r="bright"]');
+    const a = R.menu.top.querySelector('[data-a="auto"]');
+    if (r && document.activeElement !== r) r.value = String(Math.round(Light.value * 100));
+    if (a) a.setAttribute('aria-pressed', String(!!Light.auto));
   }
 
   // ---------- Temps de lecture ----------
@@ -368,7 +484,8 @@
     let y0 = null; let b0 = 0.5; let moved = false; let bubble = null;
     edge.addEventListener('touchstart', (e) => {
       y0 = e.touches[0].clientY; moved = false;
-      b0 = S.prefs.brightness >= 0 ? S.prefs.brightness : 0.5;
+      b0 = Light.value;
+      refreshBrightness().then(() => { if (!moved) b0 = Light.value; });
     }, { passive: true });
     edge.addEventListener('touchmove', (e) => {
       if (y0 === null) return;
@@ -376,15 +493,13 @@
       if (Math.abs(dy) < 8 && !moved) return;
       moved = true;
       const v = Math.min(1, Math.max(0.02, b0 - dy / 320));
-      S.prefs.brightness = Math.round(v * 100) / 100;
-      applyLight();
+      setBrightness(v);
       if (!bubble) { bubble = document.createElement('div'); bubble.className = 'bubble'; R.root.appendChild(bubble); }
       bubble.textContent = 'Luminosité ' + Math.round(v * 100) + ' %';
     }, { passive: true });
     edge.addEventListener('touchend', (e) => {
       if (bubble) { bubble.remove(); bubble = null; }
       if (!moved && R) tap(e.changedTouches[0].clientX);
-      if (moved) Store.save();
       y0 = null;
     });
     edge.addEventListener('click', (e) => { if (R && Date.now() - R.lastTouch > 800 && e.pointerType !== 'touch') tap(e.clientX); });
@@ -409,15 +524,9 @@
     const w = S.prefs.warmth || 0;
     warm.hidden = w <= 0;
     warm.style.opacity = String(w * 0.32);
-    const b = S.prefs.brightness;
     const dim = R.root.querySelector('#dim');
-    if (Native.isNative) {
-      Native.setBrightness(b);
-      dim.hidden = true;
-    } else {
-      dim.hidden = b < 0;
-      dim.style.opacity = String(b < 0 ? 0 : (1 - b) * 0.7);
-    }
+    if (Native.isNative) dim.hidden = true;
+    else { dim.hidden = false; dim.style.opacity = String((1 - Light.value) * 0.7); }
   }
 
   function restyle(rebuild) {
@@ -449,7 +558,11 @@
       <button class="icon-btn" data-a="back" aria-label="Retour à la bibliothèque">${icon('back')}</button>
       <div class="r-title"><div>${esc(R.book.title)}</div><div data-r="chap"></div></div>
       <button class="icon-btn" data-a="search" aria-label="Rechercher dans le livre">${icon('search', 20)}</button>
-      <button class="icon-btn" data-a="mark" aria-label="Marque-page">${icon('bookmark', 20)}</button></div>`;
+      <button class="icon-btn" data-a="mark" aria-label="Marque-page">${icon('bookmark', 20)}</button></div>
+      <div class="r-bright"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 4v1M12 19v1M4 12h1M19 12h1"/></svg>
+        <input type="range" min="2" max="100" step="1" data-r="bright" aria-label="Luminosité">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/></svg>
+        <button class="auto-chip" data-a="auto" aria-pressed="false" aria-label="Luminosité automatique">Auto</button></div>`;
     const panel = document.createElement('div');
     panel.className = 'r-panel';
     panel.innerHTML = `<div class="r-info"><span data-r="page"></span><span data-r="pct"></span><span data-r="left"></span></div>
@@ -470,12 +583,18 @@
     on(top, 'back', () => close());
     on(top, 'search', () => { closeMenu(); openSearch(); });
     on(top, 'mark', toggleBookmark);
+    const bright = top.querySelector('[data-r="bright"]');
+    bright.value = String(Math.round(Light.value * 100));
+    bright.oninput = () => { setBrightness(Number(bright.value) / 100); top.querySelector('[data-a="auto"]').setAttribute('aria-pressed', 'false'); };
+    on(top, 'auto', async () => { await setAuto(!Light.auto); syncBrightSlider(); if (Light.auto) setTimeout(refreshBrightness, 600); });
+    refreshBrightness();
     on(panel, 'toc', () => { closeMenu(); openToc('toc'); });
     on(panel, 'notes', () => { closeMenu(); openToc('notes'); });
     on(panel, 'text', () => { closeMenu(); openText(); });
     on(panel, 'light', () => { closeMenu(); openLight(); });
     const range = panel.querySelector('[data-r="range"]');
     range.oninput = () => {
+      if (!R.dragFrom && R.location) R.dragFrom = { cfi: R.location.start.cfi, page: (locIndex(R.location) ?? -1) + 1 };
       const v = Number(range.value) / 1000;
       panel.querySelector('[data-r="done"]').style.width = (v * 100) + '%';
       if (!R.total) return;
@@ -488,9 +607,14 @@
     range.onchange = () => {
       if (!R.total) return;
       const i = Math.min(R.total - 1, Math.floor(Number(range.value) / 1000 * R.total));
-      R.rendition.display(R.epub.locations.cfiFromLocation(i));
+      const from = R.dragFrom;
+      R.dragFrom = null;
+      R.rendition.display(R.epub.locations.cfiFromLocation(i)).then(() => {
+        if (from && from.page && Math.abs(from.page - (i + 1)) > 1) showBack(from);
+      });
     };
     refreshMenu();
+    renderBack();
   }
 
   function refreshMenu() {
@@ -542,6 +666,7 @@
     R.menu.panel.remove();
     R.menu.removeBack();
     R.menu = null;
+    renderBack();
   }
 
   // ---------- Marque-pages ----------
@@ -593,10 +718,10 @@
         <button role="tab" data-tab="marks" aria-selected="${current === 'marks'}">Marque-pages</button>
         <button role="tab" data-tab="notes" aria-selected="${current === 'notes'}">Notes</button></div><div class="list">${body}</div>`;
       s.el.querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => { current = b.dataset.tab; draw(); }; });
-      s.el.querySelectorAll('[data-toc]').forEach((b) => { b.onclick = () => { s.close(); R.rendition.display(R.flat[Number(b.dataset.toc)].href); }; });
-      s.el.querySelectorAll('[data-mark]').forEach((b) => { b.onclick = () => { const m = S.bookmarks.find((x) => x.id === b.dataset.mark); s.close(); R.rendition.display(m.cfi); }; });
+      s.el.querySelectorAll('[data-toc]').forEach((b) => { b.onclick = () => { s.close(); jumpTo(R.flat[Number(b.dataset.toc)].href); }; });
+      s.el.querySelectorAll('[data-mark]').forEach((b) => { b.onclick = () => { const m = S.bookmarks.find((x) => x.id === b.dataset.mark); s.close(); jumpTo(m.cfi); }; });
       s.el.querySelectorAll('[data-delmark]').forEach((b) => { b.onclick = () => { S.bookmarks = S.bookmarks.filter((x) => x.id !== b.dataset.delmark); Store.save(); draw(); }; });
-      s.el.querySelectorAll('[data-ann]').forEach((b) => { b.onclick = () => { const a = S.annotations.find((x) => x.id === b.dataset.ann); s.close(); R.rendition.display(a.cfi); }; });
+      s.el.querySelectorAll('[data-ann]').forEach((b) => { b.onclick = () => { const a = S.annotations.find((x) => x.id === b.dataset.ann); s.close(); jumpTo(a.cfi); }; });
       const cur = s.el.querySelector('.list-item.current');
       if (cur) cur.scrollIntoView({ block: 'center' });
     };
@@ -640,7 +765,7 @@
         b.onclick = () => {
           const r = results[Number(b.dataset.res)];
           s.close();
-          R.rendition.display(r.cfi).then(() => {
+          jumpTo(r.cfi).then(() => {
             try {
               R.rendition.annotations.highlight(r.cfi, {}, null, 'folio-search', { fill: THEMES[R.settings.theme].accent, 'fill-opacity': '0.3' });
               setTimeout(() => { try { R.rendition.annotations.remove(r.cfi, 'highlight'); drawMarks(); } catch (e) { /* rien */ } }, 2500);
@@ -710,22 +835,25 @@
   }
 
   // ---------- Panneau « Lumière » ----------
-  function openLight() {
+  async function openLight() {
     const s = UI.sheet('', { parent: R.root, half: true });
     R.closers.push(s.close);
+    await refreshBrightness();
     const draw = () => {
-      const b = S.prefs.brightness;
+      const v = Math.round(Light.value * 100);
       s.el.innerHTML = `<div class="grabber"></div><div class="sheet-head"><h2>Lumière</h2></div>
+        ${Native.isNative && !Light.allowed ? `<div class="help" style="padding:0">Pour régler la luminosité depuis Folio, Android demande l'autorisation « Modifier les paramètres système ». Le curseur du volet de notifications continue de fonctionner.<div style="margin-top:8px"><button class="btn btn-primary" data-a="allow" style="min-height:40px">Autoriser</button></div></div>` : ''}
         <div class="group" style="padding:0 14px;background:var(--bg)">
-          <div class="set-row"><label for="l-auto">Luminosité du système</label><span class="switch"><input type="checkbox" id="l-auto"${b < 0 ? ' checked' : ''}><span></span></span></div>
+          <div class="set-row"><label for="l-auto">Luminosité automatique</label><span class="switch"><input type="checkbox" id="l-auto"${Light.auto ? ' checked' : ''}><span></span></span></div>
         </div>
-        <div${b < 0 ? ' hidden' : ''}><label class="field-label" for="l-b">Luminosité · ${Math.round((b < 0 ? 0.5 : b) * 100)} %</label><input class="range" type="range" id="l-b" min="2" max="100" value="${Math.round((b < 0 ? 0.5 : b) * 100)}"></div>
+        <div><label class="field-label" for="l-b">Luminosité · ${v} %</label><input class="range" type="range" id="l-b" min="2" max="100" value="${v}"></div>
         <div><label class="field-label" for="l-w">Chaleur de l'écran · ${Math.round((S.prefs.warmth || 0) * 100)} %</label><input class="range" type="range" id="l-w" min="0" max="100" value="${Math.round((S.prefs.warmth || 0) * 100)}"></div>
-        <p class="muted" style="margin:0;font-size:13px;line-height:1.5">Astuce : glisse le doigt de haut en bas sur le bord gauche de l'écran pour régler la luminosité sans ouvrir ce menu.</p>`;
-      s.el.querySelector('#l-auto').onchange = (e) => { S.prefs.brightness = e.target.checked ? -1 : 0.5; applyLight(); Store.save(); draw(); };
+        <p class="muted" style="margin:0;font-size:13px;line-height:1.5">Astuce : glisse le doigt de haut en bas sur le bord gauche de l'écran, ou utilise le curseur sous le titre quand tu touches le centre de la page.</p>`;
+      const allow = s.el.querySelector('[data-a="allow"]');
+      if (allow) allow.onclick = () => Native.openBrightnessPermission();
+      s.el.querySelector('#l-auto').onchange = async (e) => { await setAuto(e.target.checked); await refreshBrightness(); draw(); };
       const lb = s.el.querySelector('#l-b');
-      lb.oninput = () => { S.prefs.brightness = Number(lb.value) / 100; applyLight(); lb.previousElementSibling.textContent = 'Luminosité · ' + lb.value + ' %'; };
-      lb.onchange = () => Store.save();
+      lb.oninput = () => { setBrightness(Number(lb.value) / 100); s.el.querySelector('#l-auto').checked = false; lb.previousElementSibling.textContent = 'Luminosité · ' + lb.value + ' %'; };
       const lw = s.el.querySelector('#l-w');
       lw.oninput = () => { S.prefs.warmth = Number(lw.value) / 100; applyLight(); lw.previousElementSibling.textContent = 'Chaleur de l\'écran · ' + lw.value + ' %'; };
       lw.onchange = () => Store.save();

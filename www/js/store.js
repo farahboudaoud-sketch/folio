@@ -23,6 +23,7 @@
     warmth: 0,                // 0..1
     goal: 0,                  // minutes par jour, 0 = pas d'objectif
     sort: 'recent',
+    footer: 'pages',          // pages | time (bas de page en lecture)
     kindle: { to: '', from: '', host: 'smtp.gmail.com', port: 587, hasPassword: false }
   };
 
