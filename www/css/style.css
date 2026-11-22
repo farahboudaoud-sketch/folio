@@ -307,3 +307,11 @@ textarea.text-input { height: 120px; padding: 12px 14px; line-height: 1.5; resiz
 /* « Revenir à la page… » après un saut */
 .back-pill { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--sab) + 46px); z-index: 12; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 22px; border: none; background: var(--fg); color: var(--bg); font-size: 14px; font-weight: 600; box-shadow: var(--shadow); white-space: nowrap; animation: fade .2s ease; }
 .back-pill.in-menu { bottom: auto; top: calc(var(--sat) + 132px); }
+
+/* Couverture floutée */
+.cover.blurred img { filter: blur(10px); transform: scale(1.25); }
+.blur-badge { position: absolute; right: 5px; bottom: 5px; width: 22px; height: 22px; border-radius: 11px; background: rgba(0,0,0,0.45); color: #fff; display: flex; align-items: center; justify-content: center; }
+.detail-head .cover.blurred img { filter: blur(14px); }
+.actions3 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sel-bar { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.sel-bar .tile-btn { font-size: 11px; padding: 4px 2px; }

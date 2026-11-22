@@ -53,7 +53,9 @@
     }
     let st = doc.getElementById('folio-style');
     if (!st) { st = doc.createElement('style'); st.id = 'folio-style'; doc.head.appendChild(st); }
-    st.textContent = bookCSS(R.settings);
+    // Couverture floutée : on floute aussi les images de la page de couverture du livre
+    const blurCoverPage = R.book.blurCover && contents.sectionIndex === 0;
+    st.textContent = bookCSS(R.settings) + (blurCoverPage ? ' img, svg, image { filter: blur(24px) !important; }' : '');
   }
 
   // ---------- Ouverture ----------

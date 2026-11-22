@@ -33,7 +33,9 @@
     copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/>',
     download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
     upload: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
-    play: '<path d="M7 4l13 8-13 8z" fill="currentColor" stroke="none"/>'
+    play: '<path d="M7 4l13 8-13 8z" fill="currentColor" stroke="none"/>',
+    eyeoff: '<path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0112 5c6 0 10 7 10 7a17 17 0 01-3.2 4M6.6 6.6C3.9 8.4 2 12 2 12s4 7 10 7c1.8 0 3.4-.5 4.8-1.3"/><path d="M9.9 9.9a3 3 0 004.2 4.2"/>',
+    eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'
   };
   const icon = (name, size) => `<svg width="${size || 22}" height="${size || 22}" viewBox="0 0 24 24" ${P}>${ICONS[name] || ''}</svg>`;
 
@@ -90,6 +92,7 @@
   const covers = {};
   function coverHTML(b) {
     const src = covers[b.id];
+    if (src && b.blurCover) return `<div class="cover blurred"><img src="${src}" alt=""><span class="blur-badge" aria-label="Couverture floutée">${icon('eyeoff', 14)}</span></div>`;
     if (src) return `<div class="cover"><img src="${src}" alt=""></div>`;
     return `<div class="cover" style="background:${hashColor(b.id)}"><div class="gen"><span>${esc(b.title)}</span>${b.author ? `<small>${esc(b.author)}</small>` : ''}</div></div>`;
   }
@@ -398,7 +401,7 @@
         : `<div class="list-empty">${q ? 'Aucun livre ne correspond.' : 'Aucun livre ici pour l\'instant.'}</div>`;
       if (view.selecting) {
         const dis = view.sel.size ? '' : ' disabled';
-        body += `<div class="sel-bar"><button class="tile-btn" data-sel="done"${dis}>${icon('check', 20)}Marquer lu</button><button class="tile-btn" data-sel="undone"${dis}>${icon('books', 20)}Non lu</button><button class="tile-btn" data-sel="coll"${dis}>${icon('list', 20)}Collection</button><button class="tile-btn danger" data-sel="remove"${dis}>${icon('trash', 20)}Retirer</button></div>`;
+        body += `<div class="sel-bar"><button class="tile-btn" data-sel="done"${dis}>${icon('check', 20)}Marquer lu</button><button class="tile-btn" data-sel="undone"${dis}>${icon('books', 20)}Non lu</button><button class="tile-btn" data-sel="coll"${dis}>${icon('list', 20)}Collection</button><button class="tile-btn" data-sel="blur"${dis}>${icon('eyeoff', 20)}Flouter</button><button class="tile-btn danger" data-sel="remove"${dis}>${icon('trash', 20)}Retirer</button></div>`;
       }
     }
     return `<div class="page">${head}
@@ -525,6 +528,14 @@
       toast(bs.length > 1 ? bs.length + ' livres marqués comme non lus' : 'Livre marqué comme non lu');
       stopSelecting();
     });
+    on('blur', () => {
+      const bs = chosen();
+      const all = bs.every((b) => b.blurCover);
+      bs.forEach((b) => { b.blurCover = !all; });
+      Store.save();
+      toast(all ? 'Couvertures visibles' : (bs.length > 1 ? bs.length + ' couvertures floutées' : 'Couverture floutée'));
+      stopSelecting();
+    });
     on('coll', () => {
       const bs = chosen();
       const draw = (sh) => {
@@ -623,6 +634,7 @@
           <div class="actions3">
             <button class="tile-btn" data-a="coll">${icon('list', 20)}Collection</button>
             <button class="tile-btn" data-a="done">${icon('check', 20)}${st === 'done' ? 'Marquer non lu' : 'Marquer lu'}</button>
+            <button class="tile-btn" data-a="blur" aria-pressed="${!!b.blurCover}">${icon(b.blurCover ? 'eye' : 'eyeoff', 20)}${b.blurCover ? 'Montrer la couverture' : 'Flouter la couverture'}</button>
             <button class="tile-btn danger" data-a="remove">${icon('trash', 20)}Retirer</button>
           </div>
           <div class="facts">
@@ -640,6 +652,11 @@
       on('more', (e) => { screen.querySelector('[data-desc]').textContent = desc; e.target.remove(); });
       on('kindle', () => sendToKindle(b, screen.querySelector('[data-a="kindle"]'), draw));
       on('coll', () => pickCollections(b, () => { draw(); render(); }));
+      on('blur', () => {
+        b.blurCover = !b.blurCover;
+        Store.save(); draw(); render();
+        toast(b.blurCover ? 'Couverture floutée partout, widget compris' : 'Couverture visible');
+      });
       on('done', () => {
         markDone(b, statusOf(b) !== 'done');
         Store.save(); draw(); render();
@@ -1010,9 +1027,31 @@
 
 
   // ---------- Widget de l'écran d'accueil ----------
-  let widgetCoverId = null;
+  let widgetCoverKey = null;
   let widgetLast = '';
-  function syncWidget() {
+  const blurredCache = {};
+
+  // Couverture floutée pour le widget : on réduit l'image à quelques pixels puis on l'agrandit (flou doux, fiable partout)
+  function blurredCover(id) {
+    if (blurredCache[id]) return Promise.resolve(blurredCache[id]);
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const w = 180; const h = Math.round(img.naturalHeight * (w / img.naturalWidth)) || 270;
+        const small = document.createElement('canvas'); small.width = 9; small.height = Math.max(1, Math.round(9 * h / w));
+        small.getContext('2d').drawImage(img, 0, 0, small.width, small.height);
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(small, 0, 0, w, h);
+        blurredCache[id] = c.toDataURL('image/jpeg', 0.85);
+        resolve(blurredCache[id]);
+      };
+      img.onerror = () => resolve(null);
+      img.src = covers[id];
+    });
+  }
+
+  async function syncWidget() {
     if (!Native.isNative) return;
     const cur = Object.values(S.books).filter((b) => statusOf(b) === 'reading' && !b.missing).sort((a, b) => b.openedAt - a.openedAt)[0];
     const todayMin = Math.round((S.stats.days[Store.dayKey()] || 0) / 60);
@@ -1020,13 +1059,16 @@
     const today = goal ? `${Math.min(todayMin, goal)} / ${goal} min aujourd'hui` : (todayMin ? `${todayMin} min aujourd'hui` : '');
     const data = cur ? { id: cur.id, title: cur.title, pct: Math.round((cur.pct || 0) * 100), today } : { id: '', title: '', pct: 0, today };
     const key = JSON.stringify(data);
-    const coverChanged = cur ? widgetCoverId !== cur.id : widgetCoverId !== '';
+    const coverKey = cur ? cur.id + (cur.blurCover ? ':flou' : '') : '';
+    const coverChanged = widgetCoverKey !== coverKey;
     if (key === widgetLast && !coverChanged) return;
     widgetLast = key;
     if (coverChanged) {
-      widgetCoverId = cur ? cur.id : '';
-      if (cur && covers[cur.id]) data.cover = covers[cur.id];
-      else data.noCover = true;
+      widgetCoverKey = coverKey;
+      if (cur && covers[cur.id]) {
+        const img = cur.blurCover ? await blurredCover(cur.id) : covers[cur.id];
+        if (img) data.cover = img; else data.noCover = true;
+      } else data.noCover = true;
     }
     Native.updateWidget(data);
   }
